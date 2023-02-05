@@ -1,4 +1,5 @@
 import math
+from collections import Counter
 from math import inf
 
 import numpy as np
@@ -8,7 +9,7 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils import check_random_state
 
 
-class KMeans(BaseEstimator, ClassifierMixin):
+class KMeans(BaseEstimator):
     def __init__(
             self,
             k,
@@ -179,18 +180,72 @@ class KMeans(BaseEstimator, ClassifierMixin):
         Uses the sum of self.quality for each cluster, which defaults to SSE.
         In this case, the lower the score, the better
         """
-        return self._score
+        raise NotImplementedError("No need to calculate the score for the cluster."
+                                  "Accuracy can be calcualted in KMeansClassifier.score")
 
 
-class KMeansClassifier(KMeans):
+class KMeansClassifier(KMeans, ClassifierMixin):
     """
     Subclass of the KMeans class, which allows classification type scores
     of X/y arrays, rather than calculating the overall score of the clustering
     """
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.labels = []
+
+    def count_clusters(self, X, y):
+        cluster_counts = {i: Counter() for i, _ in enumerate(self.centroids)}
+        for i in range(len(X)):
+            x_i = X.iloc[i]
+            y_i = y.iloc[i]
+            cluster_idx = self.predict(x_i)
+            cluster_counts[cluster_idx][y_i] += 1
+        return cluster_counts
+
+    def _infer(self, X, y):
+        """Infer which clusters correspond to which labels
+
+        Will find the cluster with the highest percentage of each output.
+        TODO: This is very error-prone, as it could lead to some labels being
+        overwritten, but is the best we have for now
+        """
+        cluster_counts = self.count_clusters(X, y)
+        # Find the cluster with the highest amount of each y
+        labels = {}
+        for y_i in set(y):
+            max_list = np.array([
+                v[i]/sum(v.values())
+                for c, v in cluster_counts.items()
+                for i in v if i == y_i
+            ])
+            labels[np.argmax(max_list)] = y_i
+            # Convert the labels dict into a list
+        self.labels = [labels[i] for i in sorted(labels.keys())]
+        print(f'cluster_counts: {cluster_counts}')
+        print(f'labels: {labels}')
+
+    def fit(self, X, y):
+        """Assigns k clusters and uses labelled data to classify
+
+        This method will first cluster the data using super.fit, and then use
+        those clusters as the basis for the classification. It is assumed that
+        self.k == amount of clusters in y.
+
+        :param X: An array-like object with the features of the data
+        :param y: A 1-D array-like object with the response variable
+        :return: A fitted KMeansClassifier
+        """
+        super().fit(X)
+        self._infer(X, y)
+
     def score(self, X, y):
         """Calculate the accuracy of the classification
 
         Uses the score method assigned to the class, defaults to accuracy
         """
-        pass
-
+        counter = Counter()
+        for i in range(len(X)):
+            pred = self.predict(X.iloc[i])
+            actual = y.iloc[i]
+            counter[pred == actual] += 1
+        return counter[True] / sum(counter.values())
