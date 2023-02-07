@@ -24,11 +24,11 @@ if __name__ == '__main__':
     ])
     clf = KMeansClassifier(k=2, precomputed_centroids=centroids)
     clf.fit(X_train, y_train)
-    print(clf.score(X_train, y_train))
+    print(f'y_train: {clf.score(X_train, y_train)}')
 
     guangzhou_X, guangzhou_y = get_xy(pd.read_csv('data/Guangzhou_labeled.csv'))
     shanghai_X, shanghai_y = get_xy(pd.read_csv('data/Shanghai_labeled.csv'))
     X_test = pd.concat([guangzhou_X, shanghai_X])
     y_test = pd.concat([guangzhou_y, shanghai_y])
 
-    print(clf.score(X_test, y_test))
+    print(f'y_test: {clf.score(X_test, y_test)}')

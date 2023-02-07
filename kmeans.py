@@ -113,7 +113,7 @@ class KMeans(BaseEstimator):
                 if j % 10 == 0:
                     print(f'{j}/{self.max_iter}')
                 old_centroids = self.centroids.copy()
-                cluster_score = 0
+
                 for k in range(len(self.X)):
                     x = self.X.iloc[k]
                     c = nearest_centroid(x)
@@ -129,16 +129,19 @@ class KMeans(BaseEstimator):
                 if has_converged(old_centroids, self.centroids):
                     print(f'Converged after {j}')
                     break
-
+                self.clusters = clusters
             # Get the results for every cluster
-            for centroid, cluster in clusters.items():
-                cluster_score += self.quality(centroid, cluster)
-            scores[cluster_score] = self.centroids
+            scores[self.score()] = self.centroids
             print(scores)
 
         # Fit the best centroids to the class amd return self
         # TODO: Can we always assume it's min?
-        self.centroids = scores[min(scores.keys())]
+        min_score = min(scores.keys())
+        self.centroids = scores[min_score]
+        self._score = min_score
+        # TODO: We should try to keep all the bad clusters and select the best
+        # if it doesn't impact memory too much on larger datasets
+        self.clusters = None
 
         return self
 
@@ -154,7 +157,7 @@ class KMeans(BaseEstimator):
 
     def predict(self, x):
         """Predict which cluster X should go in
-        :param X: An array-like object with the same shape as a single object
+        :param x: An array-like object with the same shape as a single object
         from self.X
         :return: The index of self.centroids which contains the correct cluster
         """
@@ -174,14 +177,25 @@ class KMeans(BaseEstimator):
             sse += math.pow(d, 2)
         return sse
 
-    def score(self, X, _y):
+    def score(self, _X=None, _y=None):
         """Calculate the score of the clustering algorithm
 
         Uses the sum of self.quality for each cluster, which defaults to SSE.
         In this case, the lower the score, the better
+
+        The score is used to calculate the error in the overall cluster, and so
+        it makes no sense to use X/y parameters. These are kept for the sake of
+        convention, but will otherwise be ignored.
+
         """
-        raise NotImplementedError("No need to calculate the score for the cluster."
-                                  "Accuracy can be calcualted in KMeansClassifier.score")
+        # Get the results for every cluster
+        if self._score:
+            return self._score
+        score = 0
+        for centroid, cluster in self.clusters.items():
+            score += self.quality(centroid, cluster)
+
+        return score
 
 
 class KMeansClassifier(KMeans, ClassifierMixin):
