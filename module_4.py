@@ -22,20 +22,22 @@ class LanguageModel:
         self.source = source
         self.word_counts = None
         self.bigrams = None
-        self.source_lines = []
 
-    def get_word_counts(self, source=None, include_start_char=True):
-        source = source or self.source
-        assert source, 'No language included for word counts'
+    def get_word_counts(self, include_start_char=True):
         counter = Counter()
-        with open(source, encoding='utf-8') as f:
+        for line in self.source_lines:
+            # self.source_lines.append(line)
+            if include_start_char:
+                line = f'{START_CHAR} {line}'
+            for word in line.rstrip('\n').split(' '):  # If we want punctuation
+                counter[word] += 1
+        return counter
+
+    @property
+    def source_lines(self):
+        with open(self.source, encoding='utf-8') as f:
             for line in f.readlines():
-                self.source_lines.append(line)
-                if include_start_char:
-                    line = f'{START_CHAR} {line}'
-                for word in line.rstrip('\n').split(' '):  # If we want punctuation
-                    counter[word] += 1
-            return counter
+                yield line
 
     @property
     def word_counts(self):
@@ -49,12 +51,11 @@ class LanguageModel:
 
     def get_bigrams(self):
         bigrams = {w: Counter() for w in self.word_counts}
-        with open(self.source, encoding='utf-8') as f:
-            for line in f.readlines():
-                prev = START_CHAR
-                for word in line.rstrip('\n').split(' '):
-                    bigrams[prev][word] += 1
-                    prev = word
+        for line in self.source_lines:
+            prev = START_CHAR
+            for word in line.rstrip('\n').split(' '):
+                bigrams[prev][word] += 1
+                prev = word
         return bigrams
 
     @property
@@ -69,7 +70,7 @@ class LanguageModel:
 
 
 class TranslationModel:
-    def __init__(self, source, target, num_iter=1):
+    def __init__(self, source, target, num_iter=20):
         """A translation model for a source and a target language
 
         :param source: An instantiated LanguageModel of the source language
@@ -81,45 +82,56 @@ class TranslationModel:
         self.source = source
         self.target = target
         self.T = num_iter
+        self.model = None
 
     def train(self):
         NULL_CHAR = 'NULL'
         t_t_s = {}  # Translation of the target language given the source
-
+        # Do this here so we don't need to generate them each time
+        # If the memory cost is too high we can shift these lines into the first loop
+        c_s_orig = {w: 0 for w in self.source.word_counts}
+        c_s_orig[NULL_CHAR] = 0
+        c_t_s_orig = {w: {} for w in c_s_orig}
         for counter in range(self.T):
-            assert len(self.source.source_lines) == len(self.target.source_lines), \
-                'There are different amounts of sentences between source and target'
-            c_s = {w: 0 for w in self.source.word_counts}
-            c_t_s = c_s.copy()
-            for s, t in zip(self.source.source_lines, self.target.source_lines):  # Each pair
+            c_s = copy.copy(c_s_orig)
+            c_t_s = copy.deepcopy(c_t_s_orig)
+            for en, (s, t) in enumerate(zip(self.source.source_lines, self.target.source_lines)):  # Each pair
+                if en >= 1000:
+                    break
                 t = t.rstrip('\n').split(' ')
                 s = s.rstrip('\n').split(' ')
                 # TODO: NULL characters can come later
-                if len(s) != len(t):
-                    continue
+                # if len(s) != len(t):
+                #     continue
+                s = [NULL_CHAR] + s
                 for i in t:  # For each word in target language
-                    # s = [NULL_CHAR] + s
                     for j in s:  # For each word in the source language
                         # Initialise randomly on the first run
                         if counter == 0:
-                            t_t_s = self.assign_random_values(t_t_s, i, j)
+                            t_t_s = self._assign_random_values(t_t_s, i, j)
                         else:
                             # Compute alignment probability
-                            delta_k_i_j = t_t_s[i][j] / (np.sum([t_t_s[word][t] for word in s]))
-                            if not c_s[j].get(t):
-                                c_s[j][t] = 0
+                            delta_k_i_j = t_t_s[j][i] / (np.sum([t_t_s[word][i] for word in s]))
+                            if not c_t_s[j].get(i):
+                                c_t_s[j][i] = 0
                             # Update pseudocount
-                            c_t_s[j][t] += delta_k_i_j
+                            c_t_s[j][i] += delta_k_i_j
                             # Update pseudocount
                             c_s[j] += delta_k_i_j
 
-            # Update probabilities
-            # TODO: Get the right values from the different dicts
-            t_t_s = c_t_s / c_s
-        return t_t_s
+            # Update probabilities to be the soft counts?
+            if counter > 0:
+                t_t_s = copy.deepcopy(c_t_s)
+        self.model = t_t_s
+        return self
 
+    def predict_word(self, word):
+        return sorted([(k, v) for k, v in self.model[word].items()], key=lambda x: x[1], reverse=True)[:20]
 
-    def assign_random_values(self, existing, word, given):
+    def predict(self, sentence):
+        pass
+
+    def _assign_random_values(self, existing, word, given):
         """Initial assignment for language alignment values"""
         if given not in existing:
             existing[given] = {word: random()}
@@ -231,8 +243,13 @@ def c():
     translation.train()
     return translation
 
+
 if __name__ == '__main__':
     a()
     b()
     out = c()
     print(out)
+    for w in ["member", "on", "speaker", "directive", "approach", "article", "state", "welcome"]:
+        print(f'=================\n{w}\n=================')
+        print(out.predict_word(w))
+
