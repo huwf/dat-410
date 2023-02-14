@@ -1,4 +1,5 @@
 import copy
+import pickle
 from random import random
 from collections import Counter
 
@@ -12,6 +13,8 @@ FILES = [
     ('data/europarl-v7.sv-en.lc.en', 'English'),
 ]
 START_CHAR = '<start>'
+NULL_CHAR = 'NULL'
+
 
 # TODO: We should probably HTMLEncode the source files as &apos; becomes & apos ;
 
@@ -70,7 +73,7 @@ class LanguageModel:
 
 
 class TranslationModel:
-    def __init__(self, source, target, num_iter=20):
+    def __init__(self, source, target, num_iter=10, early_exit=None):
         """A translation model for a source and a target language
 
         :param source: An instantiated LanguageModel of the source language
@@ -83,53 +86,116 @@ class TranslationModel:
         self.target = target
         self.T = num_iter
         self.model = None
+        self.decoded = None
+        self.early_exit = early_exit
+
+    def _get_empty_softcount_objs(self):
+        c_t_orig = {w: 0 for w in self.target.word_counts}
+        c_t_orig[NULL_CHAR] = 0
+        c_s_t_orig = {w: {} for w in c_t_orig}
+        return c_t_orig, c_s_t_orig
+
+    def _get_random_initialisation(self):
+        t_t_s = {}
+        for en, (s, t) in enumerate(zip(self.source.source_lines, self.target.source_lines)):  # Each pair
+            if isinstance(self.early_exit, int) and en >= self.early_exit:
+                break
+            t = t.rstrip('\n').split(' ')
+            s = s.rstrip('\n').split(' ')
+            # TODO: NULL characters can come later
+            # if len(s) != len(t):
+            #     continue
+            s = [NULL_CHAR] + s
+            t = [NULL_CHAR] + t
+            for i in t:  # For each word in target language
+                for j in s:  # For each word in the source language
+                    # Initialise randomly on the first run
+                    t_t_s = self._assign_random_values(t_t_s, j, i)
+                    # t_t_s = self._assign_random_values(t_t_s, i, j)
+        return t_t_s
+
+    def _predict_probabilities(self, sentences, c_s, c_s_t):
+        # counter = -1
+        for sent in sentences:  # Each pair
+            counter, tup = sent
+            s, t = tup
+
+            if isinstance(self.early_exit, int) and counter >= self.early_exit:
+                break
+            t = t.rstrip('\n').split(' ')
+            s = s.rstrip('\n').split(' ')
+            # TODO: NULL characters can come later
+            # if len(s) != len(t):
+            #     continue
+            s = [NULL_CHAR for _ in range(len(t) - len(s))] + s
+            t = [NULL_CHAR for _ in range(len(s) - len(t))] + t
+            for i in t:  # For each word in target language
+                for j in s:  # For each word in the source language
+                    # Compute alignment probability
+                    delta_k_i_j = self.model[i][j] / (np.sum([self.model[word][j] for word in t]))
+                    # delta_k_i_j = self.model[j][i] / (np.sum([self.model[word][i] for word in s]))
+                    if not c_s_t[i].get(j):
+                        c_s_t[i][j] = 0
+                    # Update pseudocount
+                    c_s_t[i][j] += delta_k_i_j
+                    # Update pseudocount
+                    c_s[i] += delta_k_i_j
+        return c_s_t
 
     def train(self):
-        NULL_CHAR = 'NULL'
-        t_t_s = {}  # Translation of the target language given the source
+        self.model = self._get_random_initialisation()  # Translation of the target language given the source
+
         # Do this here so we don't need to generate them each time
         # If the memory cost is too high we can shift these lines into the first loop
-        c_s_orig = {w: 0 for w in self.source.word_counts}
-        c_s_orig[NULL_CHAR] = 0
-        c_t_s_orig = {w: {} for w in c_s_orig}
-        for counter in range(self.T):
-            c_s = copy.copy(c_s_orig)
-            c_t_s = copy.deepcopy(c_t_s_orig)
-            for en, (s, t) in enumerate(zip(self.source.source_lines, self.target.source_lines)):  # Each pair
-                if en >= 1000:
-                    break
-                t = t.rstrip('\n').split(' ')
-                s = s.rstrip('\n').split(' ')
-                # TODO: NULL characters can come later
-                # if len(s) != len(t):
-                #     continue
-                s = [NULL_CHAR] + s
-                for i in t:  # For each word in target language
-                    for j in s:  # For each word in the source language
-                        # Initialise randomly on the first run
-                        if counter == 0:
-                            t_t_s = self._assign_random_values(t_t_s, i, j)
-                        else:
-                            # Compute alignment probability
-                            delta_k_i_j = t_t_s[j][i] / (np.sum([t_t_s[word][i] for word in s]))
-                            if not c_t_s[j].get(i):
-                                c_t_s[j][i] = 0
-                            # Update pseudocount
-                            c_t_s[j][i] += delta_k_i_j
-                            # Update pseudocount
-                            c_s[j] += delta_k_i_j
+        c_t_orig, c_s_t_orig = self._get_empty_softcount_objs()
 
-            # Update probabilities to be the soft counts?
-            if counter > 0:
-                t_t_s = copy.deepcopy(c_t_s)
-        self.model = t_t_s
+        for counter in range(self.T):
+            sentences = enumerate(zip(self.source.source_lines, self.target.source_lines))
+            c_s = copy.copy(c_t_orig)
+            c_s_t = copy.deepcopy(c_s_t_orig)
+            self.model = self._predict_probabilities(sentences, c_s, c_s_t)
+            print(f"Iteration {counter + 1}: {self.predict_word('european')}")
         return self
+
+    def decode(self):
+        decoded = {}
+        # translations are P(swedish|english)
+        # So we can do max(P(english) * P(swedish|english)) to get the translation
+        total_source_word_counts = sum(self.source.word_counts.values())
+        for word, translations in self.model.items():
+            probs = []
+            translation_values = sum(translations.values())
+            for translation in list(translations.keys()):
+                p_word = self.source.word_counts[translation] / total_source_word_counts
+                p_translation_word = translations[translation] / translation_values
+                probs.append(p_word * p_translation_word)
+            if probs:  # Ignore e.g <start>
+                best_translation = list(translations.keys())[probs.index(max(probs))]
+                decoded[best_translation] = word
+        self.decoded = decoded
+
+    def translate(self, word):
+        if not self.decoded:
+            self.decode()
+        return self.decoded[word]
+
+
 
     def predict_word(self, word):
         return sorted([(k, v) for k, v in self.model[word].items()], key=lambda x: x[1], reverse=True)[:20]
 
-    def predict(self, sentence):
-        pass
+    # def predict(self, sentence, given):
+    #     # if isinstance(sentence, str):
+    #     #     sentence = sentence.rstrip('\n').split(' ')
+    #     # if isinstance(given, str):
+    #     #     given = given.rstrip('\n').split(' ')
+    #     sentences = [(sentence, given)]
+    #     sentences = zip([sentence], [given])
+    #     t_t_s = {}
+    #     for _ in range(self.T):
+    #         c_s, c_s_t = self._get_empty_softcount_objs()
+    #         t_t_s = self._predict_probabilities(enumerate(sentences, c_s, c_s_t), c_s, c_s_t)
+    #     return t_t_s
 
     def _assign_random_values(self, existing, word, given):
         """Initial assignment for language alignment values"""
@@ -215,16 +281,17 @@ def b():
     # bigrams = get_bigrams(FILES[-1][0], words)
     sentence = "i would like your advice about rule 143 concerning inadmissibility ."
     print(f'P({sentence}) = {get_sentence_probability(model.word_counts, bigrams, sentence, smoothing=1)}')
-    long_sentence = """Those that had faith in the state as an institution were clearly at odds with the more aggressive , and
-    arguably more sensible groups , and they lost badly leading to the situation that the future was set so that for any 
-    particular set of facts it would always be possible in the great arenas , stadia , and football pitches to state 
-    with great and undisputed authority the quote attributed to the great Noam  Chomsky that The country was founded on 
-    the principle that the primary role of government is to protect property from the majority , and so it remains 
+    long_sentence = """Those with faith in the state as an institution were clearly at odds with the more aggressive
+    , and arguably more sensible groups , and they lost badly leading to the situation that the future was set so that 
+    for any particular set of facts it would always be possible in the great arenas , stadia , and football pitches to 
+    state with great and undisputed authority the quote attributed to the great Noam  Chomsky that The country was 
+    founded on the principle that the primary role of government is to protect property from the majority , 
+    and so it remains .
     """.lower()
     print(f'P(long sentence) = {get_sentence_probability(model.word_counts, bigrams, long_sentence, smoothing=1)}')
 
 
-def c():
+def c(num_iter, early_exit, load_pickle):
     """(c) Translation modeling
 
     We will now estimate the parameters of the translation model P(f|e).
@@ -232,24 +299,41 @@ def c():
     to be written backwards? Why don't we estimate P(e|f) instead?
 
     Write code that implements the estimation algorithm for IBM model 1. Then print, for either Swedish, German, or
-    French, the 10 words that the English word european is most likely to be translated into, according to your estimate.
+    French, the 10 words that the English word european is most likely to be translated into, according to your estimate
     It can be interesting to look at this list of 10 words and see how it changes during the EM iterations.
     """
     english = LanguageModel('English', 'data/europarl-v7.sv-en.lc.en')
     english.get_bigrams()
     swedish = LanguageModel('Swedish', 'data/europarl-v7.sv-en.lc.sv')
     swedish.get_bigrams()
-    translation = TranslationModel(english, swedish)
-    translation.train()
+    translation = TranslationModel(source=swedish, target=english, num_iter=num_iter, early_exit=early_exit)
+    if load_pickle:
+        with open('module4.pickle', 'rb') as handle:
+            translation.model = pickle.load(handle)
+    else:
+        translation.train()
+    translation.decode()
     return translation
 
+
+NUM_ITER = 5
+EARLY_EXIT = 10000
+LOAD_PICKLE = True
+SAVE_PICKLE = False
 
 if __name__ == '__main__':
     a()
     b()
-    out = c()
+    out = c(NUM_ITER, EARLY_EXIT, LOAD_PICKLE)
+    if SAVE_PICKLE:  # Save the model to skip training if we don't need to
+        with open('module4.pickle', 'wb') as f:
+            pickle.dump(out.model, f, protocol=pickle.HIGHEST_PROTOCOL)
     print(out)
-    for w in ["member", "on", "speaker", "directive", "approach", "article", "state", "welcome"]:
+    print('Predicting swedish|english')
+    for w in ["european", "member", "on", "speaker", "directive", "approach", "article", "state", "welcome"]:
         print(f'=================\n{w}\n=================')
         print(out.predict_word(w))
 
+    print("Translating from Swedish to English")
+    for w in ["förklara", 'även', 'men', 'återigen', 'träffa']:
+        print(f"{w}: {out.translate(w)}")
