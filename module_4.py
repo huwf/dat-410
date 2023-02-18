@@ -1,5 +1,7 @@
 import copy
+import os
 import pickle
+import re
 from random import random
 from collections import Counter
 
@@ -12,6 +14,13 @@ FILES = [
     ('data/europarl-v7.sv-en.lc.sv', 'Swedish'),
     ('data/europarl-v7.sv-en.lc.en', 'English'),
 ]
+
+TRANSLATION_FILES = [
+    (('data/europarl-v7.de-en.lc.de', 'German'), ('data/europarl-v7.de-en.lc.en', 'English')),
+    # (('data/europarl-v7.fr-en.lc.fr', 'French'), ('data/europarl-v7.fr-en.lc.en', 'English')),
+    # (('data/europarl-v7.sv-en.lc.sv', 'Swedish'), ('data/europarl-v7.sv-en.lc.en', 'English'))
+]
+
 START_CHAR = '<start>'
 NULL_CHAR = 'NULL'
 
@@ -174,12 +183,26 @@ class TranslationModel:
                 decoded[best_translation] = word
         self.decoded = decoded
 
-    def translate(self, word):
-        if not self.decoded:
-            self.decode()
-        return self.decoded[word]
-
-
+    def translate(self, sentence):
+        words = sentence.rstrip('\n').split(' ')
+        # Assume that the sentence is in the [correct] source language
+        translated_words = []
+        for word in words:
+            translated_words.append(self.decoded.get(word, 'NULL'))
+        for i in range(len(translated_words) - 1):
+            j = i + 1
+            word_i = translated_words[i]
+            word_j = translated_words[j]
+            if word_i == NULL_CHAR or word_j == NULL_CHAR:
+                continue
+            # First try P(I|J)
+            p_i_j = self.target.bigrams[word_j].get(word_i, 0)
+            p_j_i = self.target.bigrams[word_i].get(word_j, 0)
+            if p_i_j > p_j_i:
+                temp = word_j
+                translated_words[i] = translated_words[j]
+                translated_words[j] = temp
+        print(translated_words)
 
     def predict_word(self, word):
         return sorted([(k, v) for k, v in self.model[word].items()], key=lambda x: x[1], reverse=True)[:20]
@@ -221,9 +244,14 @@ def get_language_frequencies(filename, include_start_char=False):
 
 def get_top_10(words, language):
     print(f'10 most common words for {language}\n--------------------------------')
-    top = words.most_common(10)
-    for w in top:
-        print(w)
+    top = words.most_common(20)
+    counter = 0
+    for i, w in enumerate(top):
+        if re.match(r'[a-z]+', w[0]):
+            print(w)
+            counter += 1
+        if counter >= 10:
+            break
     return top
 
 
@@ -291,7 +319,7 @@ def b():
     print(f'P(long sentence) = {get_sentence_probability(model.word_counts, bigrams, long_sentence, smoothing=1)}')
 
 
-def c(num_iter, early_exit, load_pickle):
+def c(num_iter, early_exit, save_pickle, load_pickle):
     """(c) Translation modeling
 
     We will now estimate the parameters of the translation model P(f|e).
@@ -302,38 +330,70 @@ def c(num_iter, early_exit, load_pickle):
     French, the 10 words that the English word european is most likely to be translated into, according to your estimate
     It can be interesting to look at this list of 10 words and see how it changes during the EM iterations.
     """
-    english = LanguageModel('English', 'data/europarl-v7.sv-en.lc.en')
+
+    for source, target in TRANSLATION_FILES:
+        source, source_lang = source
+        target, target_lang = target
+        print(f'Modelling {source_lang}\n=======================')
+        source = LanguageModel(source_lang, source)
+        source.get_bigrams()
+        english = LanguageModel(target_lang, target)
+        english.get_bigrams()
+        translation = TranslationModel(source=source, target=english, num_iter=num_iter, early_exit=early_exit)
+
+        if load_pickle:
+            with open(f'module4.pickle.{source_lang}', 'rb') as handle:
+                translation.model = pickle.load(handle)
+        else:
+            translation.train()
+            if save_pickle:
+                with open(f'module4.pickle.{source_lang}', 'wb') as f:
+                    pickle.dump(translation.model, f, protocol=pickle.HIGHEST_PROTOCOL)
+        translation.predict_word('european')
+        translation.decode()
+
+
+def d():
+    """(d) Decoding.
+
+    Define and implement an algorithm to find a translation, given a sentence in the source language. That is, you
+    should try to find E* = argmax_E P(E|F)
+
+    In plain words, for a given source-language sentence F, we want to find the English-language sentence E that has the
+    highest probability according to the probabilistic model we have discussed. Using machine translation jargon, we
+    call this algorithm the "decoder." In practice, you can't solve this problem exactly and you'll have to come up with
+    some sort of approximation.
+
+    Exemplify how this algorithm works by showing the result of applying your translation system to a short sentence
+    from the source language.
+
+    As mentioned, it is expected that you will need to introduce a number of assumptions to make this at all feasible.
+    Please explain all simplifying assumptions that you have made, and the impact you think that they will have on the
+    quality of translations. But why is it an algorithmically difficult problem to find the English sentence that has
+    the highest probability in our model?
+    """
+    english = LanguageModel('English', FILES[-1][0])
     english.get_bigrams()
-    swedish = LanguageModel('Swedish', 'data/europarl-v7.sv-en.lc.sv')
+    swedish = LanguageModel('Swedish', FILES[-2][0])
     swedish.get_bigrams()
-    translation = TranslationModel(source=swedish, target=english, num_iter=num_iter, early_exit=early_exit)
-    if load_pickle:
-        with open('module4.pickle', 'rb') as handle:
+    translation = TranslationModel(swedish, english)  # , 5, early_exit=1000)
+    if os.path.exists('module4.pickle.Swedish'):
+        with open(f'module4.pickle.Swedish', 'rb') as handle:
             translation.model = pickle.load(handle)
     else:
         translation.train()
     translation.decode()
-    return translation
+    print(translation.translate("herr talman , fru kommissionär ! grattis , lienemann , till ett utmärkt arbete !"))
 
 
-NUM_ITER = 5
+NUM_ITER = 10
 EARLY_EXIT = 10000
-LOAD_PICKLE = True
+LOAD_PICKLE = False
 SAVE_PICKLE = False
+
 
 if __name__ == '__main__':
     a()
     b()
-    out = c(NUM_ITER, EARLY_EXIT, LOAD_PICKLE)
-    if SAVE_PICKLE:  # Save the model to skip training if we don't need to
-        with open('module4.pickle', 'wb') as f:
-            pickle.dump(out.model, f, protocol=pickle.HIGHEST_PROTOCOL)
-    print(out)
-    print('Predicting swedish|english')
-    for w in ["european", "member", "on", "speaker", "directive", "approach", "article", "state", "welcome"]:
-        print(f'=================\n{w}\n=================')
-        print(out.predict_word(w))
-
-    print("Translating from Swedish to English")
-    for w in ["förklara", 'även', 'men', 'återigen', 'träffa']:
-        print(f"{w}: {out.translate(w)}")
+    c(NUM_ITER, EARLY_EXIT, SAVE_PICKLE, LOAD_PICKLE)
+    d()
