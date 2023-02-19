@@ -68,15 +68,18 @@ class RuleBasedDiagnosticClassifier(BaseEstimator, ClassifierMixin):
         return x.symmetry_0 > self._homogeneity_n_percentile_
 
 
-if __name__ == '__main__':
+def setup_data():
     with open('data/wdbc.pkl', 'rb') as f:
         df = pickle.load(f)
         print(df)
-        clf = RuleBasedDiagnosticClassifier()
-        y = df.malignant
-        df.drop(columns=['malignant'])
-        X_train, X_test, y_train, y_test = train_test_split(df, y)
 
-        clf.fit(X_train, y_train)
-        print(clf.score(X_test, y_test))
+        y = df.malignant
+        df = df.drop(columns=['malignant'])
+        return train_test_split(df, y)
+
+if __name__ == '__main__':
+    clf = RuleBasedDiagnosticClassifier()
+    X_train, X_test, y_train, y_test = setup_data()
+    clf.fit(X_train, y_train)
+    print(clf.score(X_test, y_test))
 
