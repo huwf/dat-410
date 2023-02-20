@@ -9,10 +9,10 @@ from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
 
 class RuleBasedDiagnosticClassifier(BaseEstimator, ClassifierMixin):
     def __init__(self,
-                 cell_size_limit=0.95,
-                 cell_shape_limit=0.95,
-                 cell_texture_limit=0.95,
-                 cell_homogeneity_limit=0.95):
+                 cell_size_limit=95,
+                 cell_shape_limit=95,
+                 cell_texture_limit=95,
+                 cell_homogeneity_limit=95):
         """Rule base diagnostic predictor for breast cancer
 
         This class provides a simple method for determination of whether a cell
