@@ -41,9 +41,13 @@ class State:
 
     def transition(self, pos):
         if pos not in self.child_states:
-            self.child_states[pos] = State(copy.deepcopy(self.game), self)
+            new_state = State(copy.deepcopy(self.game), self)
+            self.child_states[pos] = new_state
+            # Only play the move if the state did not previously exist
+            # Otherwise, we only need to transition to it and decide on the move after
+            new_state.game.play_turn(new_state.game.next_player, pos)
         new_state = self.child_states[pos]
-        new_state.game.play_turn(self.game.next_player, pos)
+
         return new_state
         # self.child_states[pos] = new_state
 
@@ -71,12 +75,14 @@ class State:
 
 class MonteCarloMixin:
     def search(self, game):
-        tree = GameTree(game)
+        tree = GameTree(game, selection_policy=None)
         for i in range(5):
             pos = tree.root.selection_policy()
             state = tree.root.transition(pos)
+            print('[Simulation]')
             tree.simulate(state)
-        return tree .root.game.board.empty_squares
+            print('[End Simulation]')
+        return tree.root.game.board.empty_squares
 
     def rollout_policy(self):
         return 0

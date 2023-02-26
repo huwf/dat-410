@@ -6,7 +6,7 @@ class Game:
         self.p1 = p1
         self.p2 = p2
         self.board = board
-        self.next_player = self.p1 if next_player is None else self.p2
+        self.next_player = self.p1 if next_player is None else next_player
 
     def _is_winner(self):
         size = self.board.size
@@ -28,7 +28,7 @@ class Game:
         if any(diag_l_r) and len(diag_l_r) == 1:
             print('Winning with diagonal left to right')
             return diag_l_r.pop()
-        diag_r_l = {(i, size - i) for i in range(size)}
+        diag_r_l = {self.board[(i, size - 1 - i)] for i in range(size)}
         if any(diag_r_l) and len(diag_r_l) == 1:
             print('Winning with diagonal right to left')
             return diag_r_l.pop()
@@ -49,9 +49,9 @@ class Game:
 
     def play_turn(self, player, pos):
         assert player == self.next_player, f"It is not {player}'s turn. {self.next_player} is to play"
-        self.next_player = self.p1 if self.next_player == self.p2 else self.p2
         if not self.is_illegal_move(pos):
             self.board[pos] = player
+            self.next_player = self.p1 if self.next_player == self.p2 else self.p2
         print(self.board)
 
     def is_illegal_move(self, pos):
