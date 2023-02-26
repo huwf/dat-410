@@ -4,8 +4,11 @@ from module_6.search import MonteCarloMixin, RandomSearchMixin
 
 
 class Player:
-    def __init__(self, board, name='O'):
-        self.board = board
+    # def __init__(self, board, name='O'):
+    #     self.board = board
+    #     self.name = name
+
+    def __init__(self, name='O'):
         self.name = name
 
     def __repr__(self):
@@ -14,23 +17,34 @@ class Player:
     def __str__(self):
         return self.__repr__()
 
-    def place(self, pos=None, row=None, col=None):
+    def __eq__(self, other):
+        # TODO: Make sure to check self and other are the same class
+        return self.name == other.name
+
+    def __hash__(self):
+        return hash(self.name)
+
+    def place(self, game, pos=None, row=None, col=None):
         if row is not None and col is not None:  # Could be 0 so check for None
             pos = (row, col)
-        elif not pos:
-            raise IllegalMoveError('')
+        game.play_turn(self, pos)
+        # if self.game.board[pos]:
+        #     raise IllegalMoveError(f'{pos} has already been played. Pick another square')
+        # self.board[pos] = self
 
-        if self.board[pos]:
-            raise IllegalMoveError(f'{pos} has already been played. Pick another square')
-        self.board[pos] = self
-
-    def play(self):
-        possible_moves = self.search(self.board)
+    def play(self, game):
+        possible_moves = self.search(game)
         best_move = self.evaluate(possible_moves)
-        self.place(best_move)
+        self.place(game, best_move)
 
 
 class RandomPlayer(Player, RandomMoveMixin, RandomSearchMixin):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    pass
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
 
+
+class MonteCarloPlayer(Player, RandomMoveMixin, MonteCarloMixin):
+    pass
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
