@@ -1,6 +1,6 @@
 import numpy as np
 
-from module_6.exceptions import IllegalMoveError
+from exceptions import IllegalMoveError
 
 
 class Board:
@@ -31,10 +31,10 @@ class Board:
         down = [{self.board[j][i] for j in range(self.size)} for i in range(self.size)]
         for i in range(self.size):
             if all(self.board[i]) and len(set(self.board[i])) == 1:
-                print(f'Winning with line {i} across')
+                #print(f'Winning with line {i} across')
                 return self[(i, 0)]
             if all(down[i]) and len(down[i]) == 1:
-                print(f'Winning with line {i} down')
+                #print(f'Winning with line {i} down')
                 return down[i].pop()
 
         # if all(self.board[:, i]) and len(self.board[:, i]) == 1:
@@ -42,11 +42,11 @@ class Board:
         # Diagonals
         diag_l_r = {self[(i, i)] for i in range(self.size)}
         if any(diag_l_r) and len(diag_l_r) == 1:
-            print('Winning with diagonal left to right')
+            #print('Winning with diagonal left to right')
             return diag_l_r.pop()
         diag_r_l = {(i, self.size - i) for i in range(self.size)}
         if any(diag_r_l) and len(diag_r_l) == 1:
-            print('Winning with diagonal right to left')
+            #print('Winning with diagonal right to left')
             return diag_r_l.pop()
         return None
 

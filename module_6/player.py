@@ -1,6 +1,6 @@
-from module_6.evaluate import RandomMoveMixin
-from module_6.exceptions import IllegalMoveError
-from module_6.search import MonteCarloMixin, RandomSearchMixin
+from evaluate import RandomMoveMixin, MonteCarloMoveMixin
+from exceptions import IllegalMoveError
+from search import MonteCarloMixin, RandomSearchMixin
 
 
 class Player:
@@ -34,3 +34,6 @@ class RandomPlayer(Player, RandomMoveMixin, RandomSearchMixin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+class MonteCarloPlayer(Player,MonteCarloMixin, MonteCarloMoveMixin):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)

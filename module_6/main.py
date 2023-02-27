@@ -1,14 +1,14 @@
 import sys
 import time
 
-from module_6.board import Board
-from module_6.player import RandomPlayer
+from board import Board
+from player import RandomPlayer, MonteCarloPlayer
 
 
 if __name__ == '__main__':
     b = Board(3)
     p1 = RandomPlayer(b)
-    p2 = RandomPlayer(b, 'X')
+    p2 = MonteCarloPlayer(b, 'X')
     next_player = p1
     i = 0
     while b.empty_squares:

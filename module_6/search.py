@@ -1,6 +1,11 @@
 
 class MonteCarloMixin:
-    pass
+    def search(self, board):
+        return board.empty_squares
+            
+
+
+
 
 
 class RandomSearchMixin:
