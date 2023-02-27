@@ -1,8 +1,15 @@
 import copy
 from collections import deque
+import logging
 import random
 
-SIMULATION_RUNS = 100
+import numpy as np
+
+logger = logging.getLogger(__name__)
+
+C = 10
+SIMULATION_RUNS = 1000
+
 
 class GameTree:
     def __init__(self, game, rollout_policy=None, score_func=None):
@@ -53,19 +60,24 @@ class GameTree:
         while not state.is_terminal_node:
             pos = state.selection_policy()
             state = state.transition(pos)
-        # Backpropagate...
+        # Backpropagate
         self.score_func(state)
 
 
 class State:
     """A state in the game - current or possible future"""
-    def __init__(self, game, last_move, parent, selection_policy=None):
+    def __init__(self, game, last_move, parent, rollout_policy=None, selection_policy=None):
         self.game = game
         self.last_move = last_move
         self.parent = parent
         self.child_states = {}
+        # For unvisited nodes
         if selection_policy is None:
             selection_policy = self._selection_policy
+        # For visited (root) nodes:
+        if rollout_policy is None:
+            rollout_policy = self._selection_policy
+        self.rollout_policy = rollout_policy
         self.selection_policy = selection_policy
         self.visits = 0
         self.wins = 0
@@ -114,18 +126,30 @@ class State:
 
 class MonteCarloMixin:
     def search(self, game):
-        tree = GameTree(game, rollout_policy=None)
-        for i in range(SIMULATION_RUNS):
-            pos = tree.root.selection_policy()
+        tree = GameTree(game, rollout_policy=self.rollout_policy)
+        # Expand the root node to help determine rollout policy
+        for pos in game.board.empty_squares:
             state = tree.root.transition(pos)
-            print('[Simulation]')
             tree.simulate(state)
-            print('[End Simulation]')
+
+        # Now do the simulation
+        for i in range(SIMULATION_RUNS):
+            pos = tree.root.rollout_policy()
+            state = tree.root.transition(pos)
+            logger.debug('[Simulation]')
+            tree.simulate(state)
+            logger.debug('[End Simulation]')
         return list(tree.root.child_states.values())
         # return tree.root.game.board.empty_squares
 
-    def rollout_policy(self):
-        return 0
+    def rollout_policy(self, states):
+        scores = {}
+        for state in states:
+            exploitation = state.wins / state.visits
+            exploration = np.sqrt(np.log(state.visits)/state.visits)
+            scores[exploitation + C * exploration] = state
+        return scores[max(scores.values())]
+
 
 class RandomSearchMixin:
     def search(self, game):

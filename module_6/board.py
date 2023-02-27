@@ -14,7 +14,7 @@ class Board:
     def __repr__(self):
         ret = ''
         for b in self.board:
-            ret += f'{str(b)}\n'
+            ret += f'{str(b)} '
         return ret
 
     def __getitem__(self, item):
