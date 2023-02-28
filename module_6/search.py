@@ -1,4 +1,5 @@
 import copy
+import math
 from collections import deque
 import logging
 import random
@@ -7,7 +8,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-C = 10
+C = math.sqrt(2)
 SIMULATION_RUNS = 1000
 
 
@@ -15,7 +16,7 @@ class GameTree:
     def __init__(self, game, rollout_policy=None, score_func=None):
         self.game = game
         self.states = {}
-        self.root = State(self.game, last_move=None, parent=None)
+        self.root = State(self.game, last_move=None, parent=None, rollout_policy=rollout_policy)
         if rollout_policy is None:
             rollout_policy = self.rollout_policy
         self.root.selection_policy = rollout_policy
@@ -33,15 +34,15 @@ class GameTree:
     def states(self, value):
         self._states = value
 
-    def rollout_policy(self):
-        """Default method for visited nodes
-
-        The only node considered to be "visited" is the root node. All other nodes will likely
-        stick to uniform random selection to expand.
-
-        Can be set by setting
-        """
-        return random.sample(tuple(self.game.board.empty_squares), 1)[0]
+    # def rollout_policy(self):
+    #     """Default method for visited nodes
+    #
+    #     The only node considered to be "visited" is the root node. All other nodes will likely
+    #     stick to uniform random selection to expand.
+    #
+    #     Can be set by setting
+    #     """
+    #     return random.sample(tuple(self.game.board.empty_squares), 1)[0]
 
     def _score_func(self, state):
         """Default scoring function to evaluate a move
@@ -134,7 +135,7 @@ class MonteCarloMixin:
 
         # Now do the simulation
         for i in range(SIMULATION_RUNS):
-            pos = tree.root.rollout_policy()
+            pos = tree.root.rollout_policy(tree.root.child_states, i)
             state = tree.root.transition(pos)
             logger.debug('[Simulation]')
             tree.simulate(state)
@@ -142,13 +143,13 @@ class MonteCarloMixin:
         return list(tree.root.child_states.values())
         # return tree.root.game.board.empty_squares
 
-    def rollout_policy(self, states):
+    def rollout_policy(self, states, N):
         scores = {}
-        for state in states:
+        for pos, state in states.items():
             exploitation = state.wins / state.visits
-            exploration = np.sqrt(np.log(state.visits)/state.visits)
-            scores[exploitation + C * exploration] = state
-        return scores[max(scores.values())]
+            exploration = np.sqrt(np.log(N)/state.visits)
+            scores[exploitation + (C * exploration)] = pos
+        return scores[max(scores.keys())]
 
 
 class RandomSearchMixin:

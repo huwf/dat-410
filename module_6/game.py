@@ -1,6 +1,6 @@
 import logging
 
-from module_6.exceptions import IllegalMoveError
+from exceptions import IllegalMoveError
 
 logger = logging.getLogger(__name__)
 

@@ -1,12 +1,8 @@
-from module_6.evaluate import RandomMoveMixin, MonteCarloMoveMixin
-from module_6.exceptions import IllegalMoveError
-from module_6.search import MonteCarloMixin, RandomSearchMixin
+from evaluate import RandomMoveMixin, MonteCarloMoveMixin
+from search import MonteCarloMixin, RandomSearchMixin
 
 
 class Player:
-    # def __init__(self, board, name='O'):
-    #     self.board = board
-    #     self.name = name
 
     def __init__(self, name='O'):
         self.name = name

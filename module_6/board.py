@@ -1,6 +1,4 @@
-import numpy as np
-
-from module_6.exceptions import IllegalMoveError
+from exceptions import IllegalMoveError
 
 
 class Board:
