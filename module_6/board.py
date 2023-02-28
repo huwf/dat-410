@@ -1,6 +1,4 @@
-import numpy as np
-
-from module_6.exceptions import IllegalMoveError
+from exceptions import IllegalMoveError
 
 
 class Board:
@@ -14,7 +12,7 @@ class Board:
     def __repr__(self):
         ret = ''
         for b in self.board:
-            ret += f'{str(b)}\n'
+            ret += f'{str(b)} '
         return ret
 
     def __getitem__(self, item):
