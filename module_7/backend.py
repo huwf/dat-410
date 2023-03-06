@@ -2,13 +2,12 @@ from datetime import timedelta
 
 
 class Weather:
-    def __init__(self, **kwargs):
+    @staticmethod
+    def answer():
         pass
 
 
 class Transport:
-    def __init__(self, **kwargs):
-        pass
 
     @staticmethod
     def answer(start, dest, time, leave=True, arrive_by=False):
@@ -28,6 +27,7 @@ class Transport:
 
 
 class Translation:
-    def __init__(self, **kwargs):
-        pass
+    @staticmethod
+    def answer(word, from_language, to_language):
+        return f'{from_language} word {word} in {to_language} is antidisestablishmentarianism'
 
