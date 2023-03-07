@@ -26,7 +26,7 @@ class Agent:
 
     def talk(self, prompt, no_input=False):
         func = print if no_input else input
-        return func(prompt)
+        return func(f'{f"{self.name}: " if self.name else ""}{prompt}\n')
 
     def yesno(self, response):
         return bool(re.match(r'(yes|correct|y)', response.lower()))

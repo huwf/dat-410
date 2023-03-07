@@ -111,7 +111,8 @@ class TransportState(State):
     backend = Transport
 
     def confirm_question(self):
-        return "You want to know the transport from " + self.from_location, "to " + self.to_location, "at " + self.time
+        return f"You want to know the best transport from {self.from_location} to {self.to_location}, " \
+               f"arriving before {self.time}?"
 
 class TranslateState(State):
     REQUIRED_INFORMATION = {
@@ -142,7 +143,8 @@ class UnknownState(State):
     RULES = {
         r"^.*translate.*$": TranslateState,
         r"^.*weather.*$|^.*temperature.*$": WeatherState,
-        r"^.*transport.*$|^.*bus.*$|^.*tram.*$": TransportState,
+        # r"^.*transport.*$|^.*bus.*$|^.*tram.*$": TransportState,
+        r"^.*transport.*$|^.*get to.*$|^.*tram*$|^.*buss*": TransportState
     }
 
     @staticmethod
