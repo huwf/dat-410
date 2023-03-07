@@ -1,7 +1,7 @@
 import copy
 import re
 
-from backend import Weather, Translation
+from backend import Weather, Translation, Transport
 
 
 class StateFactory:
@@ -90,8 +90,28 @@ class WeatherState(State):
 
 
 class TransportState(State):
-    pass
+    REQUIRED_INFORMATION = {
+        'from_location': None,
+        'to_location': None,
+        'time': None,
+    }
 
+    Rule = {
+        r'(?<=from )\w+': 'from_location',
+        r'(?<=to )\w+': 'to_location',
+        r'(?<=at )\w+': 'time'
+    }
+
+    PROMPTS = {
+        'from_location': "Where do you want to go from?",
+        'to_location': "Where do you want to go to?",
+        'time': "When do you want to arrive?"
+    }
+
+    backend = Transport
+
+    def confirm_question(self):
+        return "You want to know the transport from " + self.from_location, "to " + self.to_location, "at " + self.time
 
 class TranslateState(State):
     REQUIRED_INFORMATION = {
@@ -122,6 +142,7 @@ class UnknownState(State):
     RULES = {
         r"^.*translate.*$": TranslateState,
         r"^.*weather.*$|^.*temperature.*$": WeatherState,
+        r"^.*transport.*$|^.*bus.*$|^.*tram.*$": TransportState,
     }
 
     @staticmethod

@@ -8,6 +8,8 @@ class Parser:
             return True, Weather()
         if re.match("^.*translate.*$", s):
             return True, Translate()
+        if re.match("^.*transport.*$|^.*get to.*$|^.*tram*$|^.*buss*", s):
+            return True, Transport()
 
         print("Sorry i do not know what you mean!")
         return False, None
@@ -49,7 +51,7 @@ class Translate:
         print("You want to translate" + self.word + " from " + self.from_language + " into" + self.to_language)
 
 
-class Weather():
+class Weather:
     location = ""
     time = "today"
 
@@ -66,3 +68,33 @@ class Weather():
 
     def print_question(self):
         print("you want to know what the weather is in " + self.location, "for " + self.time)
+
+
+class Transport():
+    start = ""
+    dest = ""
+    time = 0 
+
+    def find_args(self, str):
+        start = re.search(r'(?<=from )\w+', str)
+        dest = re.search(r'(?<=to )\w+', str)
+        time = re.search(r'(?<=at )\w+', str)
+        
+
+        if not start:
+            print("where do you want to start:")
+            self.start = input()
+        else:
+            self.start = start.group(0)
+
+        if not dest:
+            print("where do you want to go:")
+            self.dest = input()
+        else:
+            self.dest = dest.group(0)
+
+        if not time:
+            print("when do you want to leave:")
+            self.time = input() 
+        else:
+            self.time = time.group(0)   
