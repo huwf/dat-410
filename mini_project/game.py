@@ -9,6 +9,12 @@ logger = logging.getLogger(__name__)
 
 
 class Game:
+    """A game of chess
+
+    Thin wrapper around the chess.Board class, with a simple method to manage
+    the main state of the game and allow player objects to perform their own
+    analysis when it's their turn
+    """
     def __init__(self, p1, p2, board=None):
         self.p1 = p1
         self.p2 = p2
@@ -16,8 +22,10 @@ class Game:
 
     def play(self):
         while not self.board.is_game_over():
-            player = self.p1 if self.board.turn == chess.WHITE else self.p2
+            # TODO: Don't hardcode this
+            player = self.p1 if self.board.turn == self.p1.colour else self.p2
             move = player.play(self)
-            self.board.push(move)
-            logger.debug(self.board)
             logger.info(self.board.san(move))
+            self.board.push(move)
+            logger.debug(f'\n{self.board}')
+        print(self.board.result())

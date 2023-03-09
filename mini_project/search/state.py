@@ -2,12 +2,18 @@ import copy
 import random
 from collections import deque
 
+from mini_project.game import Game
+
 
 class BaseState:
-    """A state in the game - current or possible future"""
+    """A state in the game - current or possible future
+
+    Contains some common behaviour, but expects subclasses to implement details
+    """
 
     def __init__(self, game, parent, **_state_kwargs):
-        self.game = copy.deepcopy(game)
+        # self.game = copy.deepcopy(game)
+        self.game = Game(game.p1, game.p2, copy.deepcopy(game.board))
         self.parent = parent
         self.child_states = {}
         self.visits = 0
@@ -19,11 +25,11 @@ class BaseState:
 
     def transition(self, pos):
         if pos not in self.child_states:
-            new_state = self.State(copy.deepcopy(self.game), parent=self)
+            new_state = self.__class__(copy.deepcopy(self.game), parent=self)
             self.child_states[pos] = new_state
             # Only play the move if the state did not previously exist
             # Otherwise, we only need to transition to it and decide on the move after
-            new_state.game.play_turn(new_state.game.next_player, pos)
+            new_state.game.board.push(pos)
         new_state = self.child_states[pos]
         new_state.visits += 1
 
@@ -38,13 +44,21 @@ class BaseState:
         raise NotImplementedError('select not implemented in superclass')
 
     def traverse(self):
-        ret = deque([])
-        ret.appendleft(self)
+        """Traverse from the current node up to the root
+
+        A generator which yields each state, starting with the current one
+        """
         s = self
+        yield self
         while (s := s.parent) is not None:
-            ret.appendleft(s)
-        return ret
+            yield s
 
+    def update_score(self, score):
+        """Update the score for the state
 
-
-
+        Assuming a score for the end of a simulation, update the score in a
+        custom way. For example:
+          self.wins += 1
+          self.visits += 1
+        """
+        raise NotImplementedError('Implement update_score in subclass')

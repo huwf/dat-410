@@ -62,7 +62,13 @@ class GameTree:
             pos = state.selection_policy()
             state = state.transition(pos)
         # Backpropagate
-        self.score_func(state)
+        return self.score_func(state)
+
+    def backpropagate(self, state, score):
+        for s in state.traverse:
+            s.wins += score
+            s.visits += 1
+
 
 
 class State:
