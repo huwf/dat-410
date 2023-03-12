@@ -36,19 +36,25 @@ class AlphaBetaMixin:
 
         for move in game.board.legal_moves:
             state = tree.root.transition(move)
-            self.min_max(state, 10, ALPHA, BETA)
+            print("move: ", move)
+            self.min_max(tree, state, 2, ALPHA, BETA)
       
 
         return list(tree.root.child_states.values())
     
 
-    def min_max(self, state, depth, alpha, beta):
+    def min_max(self, tree,state, depth, alpha, beta):
+        
         if depth == 0 or state.game.board.is_game_over():
-            return state.score
+            score = tree.score_func(state.game, state.game.board.turn)
+        
+            return score
+
+                        
         if state.game.board.turn:
             value = ALPHA
             for move in state.game.board.legal_moves:
-                value = max(value, self.min_max(state.transition(move), depth - 1, alpha, beta))
+                value = max(value, self.min_max(tree,state.transition(move), depth - 1, alpha, beta))
                 state.update_score(value)
                 alpha = max(alpha, value)
                 if beta <= alpha:
@@ -57,7 +63,8 @@ class AlphaBetaMixin:
         else:
             value = BETA
             for move in state.game.board.legal_moves:
-                value = min(value, self.min_max(state.transition(move), depth - 1, alpha, beta))
+                
+                value = min(value, self.min_max(tree,state.transition(move), depth - 1, alpha, beta))
                 state.update_score(value)
                 beta = min(beta, value)
                 if beta <= alpha:
