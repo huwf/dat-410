@@ -8,7 +8,7 @@ amount of moves and get the win/draw/loss scores from
 import chess
 from stockfish import Stockfish
 
-from mini_project.game import Game
+from game import Game
 
 
 def stockfish(game: Game, start_player: chess.Color):
