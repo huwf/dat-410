@@ -1,7 +1,7 @@
 import logging
 
 from game import *
-from mini_project.search.monte_carlo import MonteCarloMixin
+from search.monte_carlo import MonteCarloMixin
 from player import *
 
 logging.basicConfig(level=logging.INFO)
