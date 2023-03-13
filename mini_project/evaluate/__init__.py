@@ -11,13 +11,26 @@ from stockfish import Stockfish
 from mini_project.game import Game
 
 
-def stockfish(game: Game, start_player: chess.Color):
-    s = Stockfish(path="stockfish")
-    fen = game.board.fen()
+def stockfish(board, start_player: chess.Color, stockfish_inst=None):
+    s = stockfish_inst or Stockfish(path="stockfish")
+    fen = board.fen()
     s.set_fen_position(fen)
     wdl = s.get_wdl_stats()
+    # print(wdl, s.get_evaluation())
+    # print(s.get_top_moves(len(list(board.legal_moves))))
     # It won't necessarily be the same player's move now as it was from the
     # start of the simulation, so we need to get the correct value
     wins = wdl[0] if (fen.split()[1] == 'w') == start_player else wdl[2]
     return (wins + (0.5 * wdl[1])) / sum(wdl)
+
+
+def stockfish_evaluate_all(board, stockfish_inst=None):
+    s = stockfish_inst or Stockfish(path="stockfish")
+    fen = board.fen()
+    s.set_fen_position(fen)
+    wdl = s.get_wdl_stats()
+    # print(wdl, s.get_evaluation())
+    return s.get_top_moves(len(list(board.legal_moves)))
+    # It won't necessarily be the same player's move now as it was from the
+    # start of the simulation, so we need to get the correct value
 

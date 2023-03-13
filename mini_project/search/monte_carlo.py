@@ -94,4 +94,4 @@ class MonteCarloGameTree(GameTree):
         super().__init__(game)  #, rollout_policy=rollout_policy, selection_policy=selection_policy)
 
     def score_func(self, game, turn):
-        return stockfish(game, turn)
+        return stockfish(game.board, turn)
