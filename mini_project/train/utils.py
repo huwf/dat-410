@@ -6,9 +6,9 @@ import numpy as np
 import pandas as pd
 from stockfish import Stockfish
 
-from mini_project.evaluate import stockfish, stockfish_evaluate_all
+from mini_project.evaluate import stockfish_evaluate_all
+from mini_project.utils import fen_to_bitboard
 
-BITBOARD_PIECE_ORDER = [chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN, chess.KING]
 COLUMNS = [
     'PuzzleId',
     'FEN',
@@ -22,7 +22,6 @@ COLUMNS = [
     'OpeningFamily',
     'OpeningVariation'
 ]
-KNIGHT_MOVES = [17, 15, 10, 6, -17, -15, -10, -6]
 SUBSET = 100
 
 def preprocess_csv(path):
@@ -38,38 +37,6 @@ def preprocess_csv(path):
                 if len(row) == 10:
                     row.append('')
                 writer.writerow(row)
-
-
-def fen_to_bitboard(fen, reverse_order=False):
-    """Takes a FEN position, and returns an array representing the board
-    :param fen: A string in FEN format indicating the current state of play
-    See https://en.wikipedia.org/wiki/Forsyth-Edwards_Notation
-    :return: array of length 772 in the following format:
-    For each piece, blocks of 64 for an 8 x 8 chess board where 1 indicates
-    the presence of the piece, and 0 indicates the absence.
-    The first 6 * 64 in the array is the pieces for the player to move, the
-    second 6 * 64 is the opponent, the final four squares indicate whether
-    castling is allowed (current player first) for king's side and queen's side
-    Piece order: PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
-    """
-    board = chess.Board(fen)
-    # 64 squares, 6 types of piece, 2 players, 2 types of castling (x2)
-    arr_size = (64 * 6 * 2) + 4
-    arr = np.zeros(arr_size, dtype='int')
-    # So we know whose turn it is, we put the next player's pieces first
-    order = [chess.WHITE, chess.BLACK] if board.turn == chess.WHITE else [chess.BLACK, chess.WHITE]
-    if reverse_order:
-        order = [not c for c in order]
-    for i, colour in enumerate(order):
-
-        for j, piece in enumerate(BITBOARD_PIECE_ORDER):
-            for k in list(board.pieces(piece, colour)):
-                idx = (i * arr_size // 2) + (j * 64) + k
-                arr[idx] = 1
-        castle_idx = arr_size - 4 + (2 * i)
-        arr[castle_idx] = board.has_kingside_castling_rights(colour)
-        arr[castle_idx + 1] = board.has_queenside_castling_rights(colour)
-    return arr
 
 
 def get_last_move_from_bitboard_uci(before, after):
@@ -105,40 +72,6 @@ def get_puzzle(df):
     df['output'] = fen_to_bitboard(new_fen, reverse_order=True).astype('object')
     df['winning_fen'] = new_fen
     return df
-
-
-def get_queen_positions(end_positions):
-    print('get_queen_positions')
-    for square in chess.SQUARES:
-        board = chess.Board()
-        board.clear_board()
-        board.set_piece_at(square, chess.Piece(chess.QUEEN, chess.WHITE))
-        idx = chess.QUEEN
-        end_positions[square][idx] = [m.to_square for m in board.legal_moves]
-    return end_positions
-
-
-def get_knight_positions(end_positions):
-    # If a knight starts from the middle, it can go these squares (assuming 0-63)
-    # Some will be illegal (e.g if they are negative or on the edge of the board)
-    # But these will always have a probability of 0
-    for square in chess.SQUARES:
-        for i in KNIGHT_MOVES:
-            end_positions[square][chess.KNIGHT].append(square + i)
-    return end_positions
-
-
-def get_promotions(end_positions):
-    for square in chess.SQUARES:
-        # print(square)
-        # Capture left, advance, capture right (even if illegal)
-        for s in [7, 8, 9]:
-            for _ in BITBOARD_PIECE_ORDER[1:]:  # Could get all of these possible pieces
-                end_positions[square][chess.PAWN].append(square + s)
-    return end_positions
-
-
-
 
 
 def write_pickle():
@@ -181,8 +114,38 @@ def get_input_output_df():
         pd.DataFrame(output_arrays).to_pickle(f'{new_pickles}/{SUBSET}_out_{f}')
 
 
+def bugfix_input_output_df():
+    pickle_dir = '../../data/new_pickles'
+    processed = set()
+    concat_in = pd.DataFrame()
+    concat_out = pd.Series()
+    for f in os.listdir(pickle_dir):
+        if 'out' in f:
+            continue
+        f_in = f'{pickle_dir}/{f}'
+        df_in = pd.read_pickle(f_in)
+        df_out = pd.read_pickle(f_in.replace('in', 'out')).to_numpy()
+        new_arr_out = []
+        indexes = []
+        for i in range(len(df_out)):
+            try:
+                _ = np.where(df_out[i] > 0)
+                new_arr_out.append(df_out[i].astype('float32'))
+                indexes.append(i)
+            except ValueError:
+                continue
+        concat_in = pd.concat([concat_in, df_in[df_in.index.isin(indexes)]])
+        concat_out = pd.concat([concat_out, pd.Series(new_arr_out)])
+    concat_in.to_pickle('df_in.pickle')
+    concat_out.to_pickle('df_out.pickle')
+
+
+
 if __name__ == '__main__':
-    get_input_output_df()
+    # get_input_output_df()
+    bugfix_input_output_df()
+
+
     # path = '../../data/lichess_db_puzzle.csv'
     # to_bitboard()
     # preprocess_csv(path)

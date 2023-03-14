@@ -1,9 +1,11 @@
 import chess
 import numpy as np
 
-from mini_project.train.utils import BITBOARD_PIECE_ORDER
+# from utils import BITBOARD_PIECE_ORDER
 
+BITBOARD_PIECE_ORDER = [chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN, chess.KING]
 KNIGHT_MOVES = [17, 15, 10, 6, -17, -15, -10, -6]
+
 
 def get_queen_positions(end_positions):
     for square in chess.SQUARES:
@@ -13,6 +15,7 @@ def get_queen_positions(end_positions):
         idx = chess.QUEEN
         end_positions[square][idx] = [m.to_square for m in board.legal_moves]
     return end_positions
+
 
 def get_knight_positions(end_positions):
     # If a knight starts from the middle, it can go these squares (assuming 0-63)
@@ -32,10 +35,12 @@ def get_promotions(end_positions):
                 end_positions[square][chess.PAWN].append(square + s)
     return end_positions
 
+
 end_positions = {square: {chess.QUEEN: [], chess.KNIGHT: [], chess.PAWN: []} for square in chess.SQUARES}
 end_positions = get_queen_positions(end_positions)
 end_positions = get_knight_positions(end_positions)
 end_positions = get_promotions(end_positions)
+
 
 def end_positions_to_array(e):
     length = 0

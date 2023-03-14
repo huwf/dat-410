@@ -24,6 +24,11 @@ def stockfish(board, start_player: chess.Color, stockfish_inst=None):
     return (wins + (0.5 * wdl[1])) / sum(wdl)
 
 
+def play_to_end(board, start_player: chess.Color):
+    pass
+
+
+
 def stockfish_evaluate_all(board, stockfish_inst=None):
     s = stockfish_inst or Stockfish(path="stockfish")
     fen = board.fen()

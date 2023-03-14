@@ -32,11 +32,11 @@ def get_policy_distribution(board, res, output_array):
         return output_array
     if board.turn:  # White to play
         low = min(scores)
-        scores = np.array(scores) + np.abs(min(scores)) + 1
-        move_sum = np.sum(scores)
+        scores = np.array(scores) + np.abs(low) + 1
     else:
         high = max(scores)
-        move_sum = np.array(scores) - (np.abs(high) + 1)
+        scores = np.array(scores) - (np.abs(high) + 1)
+    move_sum = np.sum(scores)
     i = 0
     for m in res:
         if m.get('Centipawn') is None:
@@ -71,7 +71,12 @@ def inputs(df):
 
 
 def outputs(df):
-    return tf.convert_to_tensor(list(df))
+    try:
+        return tf.convert_to_tensor(list(df))
+    except ValueError as e:
+        print(str(e))
+        raise
+
     # ret = df.to_numpy()
     # ret = tf.convert_to_tensor([list(a) for a in ret])
     # return ret
@@ -105,18 +110,19 @@ def make_convnet(X_train, y_train, X_test, y_test, flatten_first=False):
 
 if __name__ == '__main__':
 
-    # print(tf.config.list_physical_devices('GPU'))
+    import os
+    print(os.getcwd())
     ins = inputs(
-        pd.read_pickle('../../data/new_pickles/100_in_lichess_db_puzzle.csv.processed.32.pickle')
+        pd.read_pickle('train/df_in.pickle')
     )
     outs = outputs(
-        pd.read_pickle('../../data/new_pickles/100_out_lichess_db_puzzle.csv.processed.32.pickle')
+        pd.read_pickle('train/df_out.pickle')
     )
 
     X_train = ins[:80]
-    X_test = ins[80:]
+    X_test = ins[80:100]
     y_train = outs[:80]
-    y_test = outs[80:]
+    y_test = outs[80:100]
     print(X_train[0].shape)
     net = make_convnet(X_train, y_train, X_test, y_test)
     print(net)
