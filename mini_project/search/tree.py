@@ -1,6 +1,6 @@
 import logging
 
-from mini_project.search.state import *
+from search.state import *
 
 
 logger = logging.getLogger(__name__)

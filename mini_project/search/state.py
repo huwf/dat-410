@@ -2,7 +2,7 @@ import copy
 import random
 from collections import deque
 
-from mini_project.game import Game
+from game import Game
 
 
 class BaseState:

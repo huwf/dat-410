@@ -3,9 +3,9 @@
 import logging
 import random
 
-from mini_project.evaluate import stockfish
-from mini_project.search.state import BaseState
-from mini_project.search.tree import GameTree
+from evaluate import stockfish
+from search.state import BaseState
+from search.tree import GameTree
 
 SIMULATION_RUNS = 10
 
