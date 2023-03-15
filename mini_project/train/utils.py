@@ -7,6 +7,7 @@ import pandas as pd
 from stockfish import Stockfish
 
 from mini_project.evaluate import stockfish_evaluate_all
+from mini_project.train.train import get_policy_distribution
 from mini_project.utils import fen_to_bitboard
 
 COLUMNS = [
@@ -86,14 +87,14 @@ def write_pickle():
             df = None
 
 
-def get_input_output_df():
+def get_input_output_df(reverse=False):
     s = Stockfish('stockfish')
     from mini_project.train.output_features import end_positions, end_positions_to_array
     from mini_project.train.train import get_policy_distribution
     pickle_dir = '../../data/pickles'
     new_pickles = '../../data/new_pickles'
-
-    for f in os.listdir(pickle_dir):
+    it = os.listdir(pickle_dir)
+    for f in it if not reverse else np.flip(it):
         print(f)
         if os.path.exists(f'{new_pickles}/100_in_{f}'):
             print('Already exists')
@@ -108,20 +109,21 @@ def get_input_output_df():
         for i in range(len(arr)):
             fen = arr[0:, 2][i]
             board = chess.Board(fen)
-            res = stockfish_evaluate_all(board, stockfish_inst=s)
+            res = stockfish_evaluate_all(board)
             output_arrays[i] = get_policy_distribution(board, res, output_arrays[i])
         pd.DataFrame(arr).to_pickle(f'{new_pickles}/{SUBSET}_in_{f}')
         pd.DataFrame(output_arrays).to_pickle(f'{new_pickles}/{SUBSET}_out_{f}')
 
 
-def bugfix_input_output_df():
+def bugfix_input_output_df(reverse=False):
     pickle_dir = '../../data/new_pickles'
-    processed = set()
     concat_in = pd.DataFrame()
     concat_out = pd.Series()
-    for f in os.listdir(pickle_dir):
+    it = os.listdir(pickle_dir)
+    for f in it if not reverse else np.flip(it):
         if 'out' in f:
             continue
+        print(f)
         f_in = f'{pickle_dir}/{f}'
         df_in = pd.read_pickle(f_in)
         df_out = pd.read_pickle(f_in.replace('in', 'out')).to_numpy()
@@ -133,17 +135,22 @@ def bugfix_input_output_df():
                 new_arr_out.append(df_out[i].astype('float32'))
                 indexes.append(i)
             except ValueError:
-                continue
+                print(f'Fixing {i}')
+                board = chess.Board(df_in.iloc[i][2])
+                res = stockfish_evaluate_all(board)
+                output_array = df_out[i]
+                output_array = get_policy_distribution(board, res, output_array)
+                new_arr_out.append(output_array.astype('float32'))
         concat_in = pd.concat([concat_in, df_in[df_in.index.isin(indexes)]])
         concat_out = pd.concat([concat_out, pd.Series(new_arr_out)])
-    concat_in.to_pickle('df_in.pickle')
-    concat_out.to_pickle('df_out.pickle')
+    concat_in.to_pickle(f'df_in.pickle{".reverse" if reverse else ""}')
+    concat_out.to_pickle(f'df_out.pickle{".reverse" if reverse else ""}')
 
 
 
 if __name__ == '__main__':
-    # get_input_output_df()
     bugfix_input_output_df()
+    get_input_output_df()
 
 
     # path = '../../data/lichess_db_puzzle.csv'

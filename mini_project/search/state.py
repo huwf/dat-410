@@ -4,7 +4,6 @@ from collections import deque
 
 from mini_project.game import Game
 
-
 class BaseState:
     """A state in the game - current or possible future
 

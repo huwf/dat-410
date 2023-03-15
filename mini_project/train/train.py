@@ -47,19 +47,19 @@ def get_policy_distribution(board, res, output_array):
     return output_array
 
 
-import numpy as np
-from matplotlib import pyplot as plt
-import tensorflow.keras as keras
-from tensorflow.keras.datasets import mnist
-from tensorflow.keras.layers import Dense, Flatten
-from tensorflow.keras.layers import Conv2D, MaxPooling2D
-from tensorflow.keras.models import Sequential
-
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-
-from tensorflow.keras import applications
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
-from tensorflow.keras.applications.vgg16 import decode_predictions, preprocess_input
+# import numpy as np
+# from matplotlib import pyplot as plt
+# import tensorflow.keras as keras
+# from tensorflow.keras.datasets import mnist
+# from tensorflow.keras.layers import Dense, Flatten
+# from tensorflow.keras.layers import Conv2D, MaxPooling2D
+# from tensorflow.keras.models import Sequential
+#
+# from tensorflow.keras.preprocessing.image import ImageDataGenerator
+#
+# from tensorflow.keras import applications
+# from tensorflow.keras.preprocessing.image import load_img, img_to_array
+# from tensorflow.keras.applications.vgg16 import decode_predictions, preprocess_input
 #%%
 
 import tensorflow as tf
@@ -108,24 +108,31 @@ def make_convnet(X_train, y_train, X_test, y_test, flatten_first=False):
     return model
 
 
+
 if __name__ == '__main__':
+    from utils import *
+    bugfix_input_output_df(reverse=True)
+    get_input_output_df(reverse=True)
 
-    import os
-    print(os.getcwd())
-    ins = inputs(
-        pd.read_pickle('train/df_in.pickle')
-    )
-    outs = outputs(
-        pd.read_pickle('train/df_out.pickle')
-    )
+    # import os
+    # print(os.getcwd())
+    # ins = inputs(
+    #     pd.read_pickle('train/df_in.pickle')
+    # )
+    # outs = outputs(
+    #     pd.read_pickle('train/df_out.pickle')
+    # )
+    #
+    # X_train = ins[:80]
+    # X_test = ins[80:100]
+    # y_train = outs[:80]
+    # y_test = outs[80:100]
+    # print(X_train[0].shape)
+    # net = make_convnet(X_train, y_train, X_test, y_test)
+    # print(net)
 
-    X_train = ins[:80]
-    X_test = ins[80:100]
-    y_train = outs[:80]
-    y_test = outs[80:100]
-    print(X_train[0].shape)
-    net = make_convnet(X_train, y_train, X_test, y_test)
-    print(net)
+
+
     # puzzle = df.iloc[32]
     # board = chess.Board(puzzle['FEN'])
     # print('White' if board.turn else 'Black')

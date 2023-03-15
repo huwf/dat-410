@@ -20,7 +20,8 @@ class Game:
         self.p2 = p2
         self.board = board or chess.Board()
 
-    def play(self):
+    def play(self, next_move=False):
+        """If next_move, stop after the next move"""
         while not self.board.is_game_over():
             # TODO: Don't hardcode this
             player = self.p1 if self.board.turn == self.p1.colour else self.p2
@@ -28,4 +29,6 @@ class Game:
             logger.info(self.board.san(move))
             self.board.push(move)
             logger.debug(f'\n{self.board}')
+            if next_move:
+                break
         print(self.board.result())

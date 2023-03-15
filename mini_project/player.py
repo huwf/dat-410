@@ -6,6 +6,10 @@ from stockfish import Stockfish
 
 logger = logging.getLogger(__name__)
 
+stockfish_inst = None
+
+
+
 
 class Player:
     """A chess player
@@ -14,9 +18,12 @@ class Player:
 
     All implementation should be done in a subclass
     """
-    def __init__(self, colour=chess.WHITE, name=None):
+    def __init__(self, colour=chess.WHITE, name=None):  # , stockfish=None):
         self.colour = colour
         self.name = name or ('White' if colour else 'Black')
+        # self.stockfish = stockfish
+
+
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.name}>"
@@ -31,17 +38,6 @@ class Player:
         raise NotImplementedError('play not implemented for superclass')
 
 
-class StockfishEvalMixin(Player):
-
-    @property
-    def stockfish(self):
-        if not self._stockfish:
-            self.stockfish = Stockfish("stockfish")
-        return self._stockfish
-
-    @stockfish.setter
-    def stockfish(self, value):
-        self._stockfish = value
 
 class InternalEngine(Player):
     """A generic engine defined in this application
@@ -52,6 +48,12 @@ class InternalEngine(Player):
         possible_moves = self.search(game)
         move = self.evaluate(possible_moves)
         return move
+
+
+# class StockfishInstInternalEngine:
+#     def __init__(self, colour=chess.WHITE, name=None, stockfish=None):
+#         super().__init__(colour=colour, name=name)
+
 
 
 class FeedbackInternalEngine(InternalEngine):

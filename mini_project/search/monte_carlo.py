@@ -8,7 +8,7 @@ from mini_project.evaluate import stockfish
 from mini_project.search.state import BaseState
 from mini_project.search.tree import GameTree
 
-SIMULATION_RUNS = 10
+SIMULATION_RUNS = 200
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,7 @@ class MonteCarloMixin:
     Assumes that the root node is unexpanded, and so will go through each move
     at least once before adopting a selection policy (defined in MonteCarloState)
     """
+
     def search(self, game):
         """Perform simulation on SIMULATION_RUNS worth of moves
 
@@ -58,11 +59,15 @@ class MonteCarloMixin:
         return ordered[0].game.board.pop()
 
 
+class MonteCarloStockfishMixin(MonteCarloMixin):
+    def _get_eval_distribution(self, game):
+        tree = MonteCarloStockfishGameTree(game)
+        return self._rollout_distribution(game, tree)
+
+
 class MonteCarloModelMixin(MonteCarloMixin):
     """Get the rollout distribution from a model"""
     def _rollout_distribution(self, game, tree):
-
-
         for move in game.board.legal_moves:
             state = tree.root.transition(move)
             tree.simulate(state)
@@ -105,12 +110,6 @@ class MonteCarloState(BaseState):
 
 
 class MonteCarloGameTree(GameTree):
-    def score_func(self, game, turn):
-        """Play to the end, and see what the result is"""
-
-
-
-class MonteCarloStockfishGameTree(MonteCarloGameTree):
     State = MonteCarloState
 
     def __init__(self, game, rollout_policy=None, selection_policy=None):
@@ -121,5 +120,18 @@ class MonteCarloStockfishGameTree(MonteCarloGameTree):
         super().__init__(game)  #, rollout_policy=rollout_policy, selection_policy=selection_policy)
 
     def score_func(self, game, turn):
-        return stockfish(game.board, turn)
+        """Play to the end, and see what the result is"""
+        outcome = game.board.outcome()
+        winner = outcome.winner
+        if winner == game.p1:
+            return 1
+        if winner == game.p2:
+            return 0
+        return 0.5
+
+
+class MonteCarloStockfishGameTree(MonteCarloGameTree):
+
+    def score_func(self, game, turn):
+        return stockfish(game, turn)  #, game.p1.stockfish)
 
