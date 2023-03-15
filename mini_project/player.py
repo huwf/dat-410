@@ -2,8 +2,13 @@ import logging
 
 import chess
 import chess.engine
+from stockfish import Stockfish
 
 logger = logging.getLogger(__name__)
+
+stockfish_inst = None
+
+
 
 
 class Player:
@@ -13,9 +18,12 @@ class Player:
 
     All implementation should be done in a subclass
     """
-    def __init__(self, colour=chess.WHITE, name=None):
+    def __init__(self, colour=chess.WHITE, name=None):  # , stockfish=None):
         self.colour = colour
         self.name = name or ('White' if colour else 'Black')
+        # self.stockfish = stockfish
+
+
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.name}>"
@@ -24,10 +32,11 @@ class Player:
         raise NotImplementedError('search not implemented in superclass')
 
     def evaluate(self, states):
-        pass
+        raise NotImplementedError('evaluate not implemented for superclass')
 
     def play(self, game, *args, **kwargs):
         raise NotImplementedError('play not implemented for superclass')
+
 
 
 class InternalEngine(Player):
@@ -39,6 +48,25 @@ class InternalEngine(Player):
         possible_moves = self.search(game)
         move = self.evaluate(possible_moves)
         return move
+
+
+# class StockfishInstInternalEngine:
+#     def __init__(self, colour=chess.WHITE, name=None, stockfish=None):
+#         super().__init__(colour=colour, name=name)
+
+
+
+class FeedbackInternalEngine(InternalEngine):
+    """An internal engine which can update the model
+
+    After calling self.search() this engine will save the results of the move
+    into a DataFrame to be input into the model again
+    """
+    def search(self, game):
+        ret = super().search(game)
+        raise NotImplementedError('No time to do this yet')
+        # return ret
+
 
 
 class ExternalEngine(Player):

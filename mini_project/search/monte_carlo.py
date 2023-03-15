@@ -1,13 +1,14 @@
 """Module for implementing chess with a Monte-Carlo search tree"""
 
 import logging
+import math
 import random
 
 from evaluate import stockfish
 from search.state import BaseState
 from search.tree import GameTree
 
-SIMULATION_RUNS = 10
+SIMULATION_RUNS = 200
 
 logger = logging.getLogger(__name__)
 
@@ -18,27 +19,36 @@ class MonteCarloMixin:
     Assumes that the root node is unexpanded, and so will go through each move
     at least once before adopting a selection policy (defined in MonteCarloState)
     """
+
     def search(self, game):
         """Perform simulation on SIMULATION_RUNS worth of moves
 
         By default the rollout/selection policies are random, but this can be
         overwritten to something more sensible
         """
-        tree = MonteCarloGameTree(game)
+
         # Expand the root node to help determine rollout policy
-        for move in game.board.legal_moves:
-            state = tree.root.transition(move)
-            tree.simulate(state)
+        tree = self._get_eval_distribution(game)
 
         # Now do the simulation
         for i in range(SIMULATION_RUNS):
             move = tree.root.rollout_policy(tree.root.child_states, i)
             state = tree.root.transition(move)
             logger.debug('[Simulation]')
-            tree.simulate(state)
+            tree.simulate(state, depth=math.inf)
             logger.debug('[End Simulation]')
 
         return list(tree.root.child_states.values())
+
+    def _get_eval_distribution(self, game):
+        tree = MonteCarloGameTree(game)
+        return self._rollout_distribution(game, tree)
+
+    def _rollout_distribution(self, game, tree):
+        for move in game.board.legal_moves:
+            state = tree.root.transition(move)
+            tree.simulate(state)
+        return tree
 
     def evaluate(self, states):
         """Return the move for the highest score
@@ -47,6 +57,21 @@ class MonteCarloMixin:
         """
         ordered = sorted(states, key=lambda x: x.score, reverse=True)
         return ordered[0].game.board.pop()
+
+
+class MonteCarloStockfishMixin(MonteCarloMixin):
+    def _get_eval_distribution(self, game):
+        tree = MonteCarloStockfishGameTree(game)
+        return self._rollout_distribution(game, tree)
+
+
+class MonteCarloModelMixin(MonteCarloMixin):
+    """Get the rollout distribution from a model"""
+    def _rollout_distribution(self, game, tree):
+        for move in game.board.legal_moves:
+            state = tree.root.transition(move)
+            tree.simulate(state)
+        return tree
 
 
 class MonteCarloState(BaseState):
@@ -83,6 +108,7 @@ class MonteCarloState(BaseState):
         self.wins += score
         self.visits += 1
 
+
 class MonteCarloGameTree(GameTree):
     State = MonteCarloState
 
@@ -94,4 +120,18 @@ class MonteCarloGameTree(GameTree):
         super().__init__(game)  #, rollout_policy=rollout_policy, selection_policy=selection_policy)
 
     def score_func(self, game, turn):
-        return stockfish(game, turn)
+        """Play to the end, and see what the result is"""
+        outcome = game.board.outcome()
+        winner = outcome.winner
+        if winner == game.p1:
+            return 1
+        if winner == game.p2:
+            return 0
+        return 0.5
+
+
+class MonteCarloStockfishGameTree(MonteCarloGameTree):
+
+    def score_func(self, game, turn):
+        return stockfish(game, turn)  #, game.p1.stockfish)
+

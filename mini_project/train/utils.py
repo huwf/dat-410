@@ -4,8 +4,12 @@ import os
 import chess
 import numpy as np
 import pandas as pd
+from stockfish import Stockfish
 
-BITBOARD_PIECE_ORDER = [chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN, chess.KING]
+from mini_project.evaluate import stockfish_evaluate_all
+from mini_project.train.train import get_policy_distribution
+from mini_project.utils import fen_to_bitboard
+
 COLUMNS = [
     'PuzzleId',
     'FEN',
@@ -19,7 +23,7 @@ COLUMNS = [
     'OpeningFamily',
     'OpeningVariation'
 ]
-
+SUBSET = 100
 
 def preprocess_csv(path):
     """Pandas doesn't like rows of different lengths for some reason, so add an
@@ -34,38 +38,6 @@ def preprocess_csv(path):
                 if len(row) == 10:
                     row.append('')
                 writer.writerow(row)
-
-
-def fen_to_bitboard(fen, reverse_order=False):
-    """Takes a FEN position, and returns an array representing the board
-    :param fen: A string in FEN format indicating the current state of play
-    See https://en.wikipedia.org/wiki/Forsyth-Edwards_Notation
-    :return: array of length 772 in the following format:
-    For each piece, blocks of 64 for an 8 x 8 chess board where 1 indicates
-    the presence of the piece, and 0 indicates the absence.
-    The first 6 * 64 in the array is the pieces for the player to move, the
-    second 6 * 64 is the opponent, the final four squares indicate whether
-    castling is allowed (current player first) for king's side and queen's side
-    Piece order: PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
-    """
-    board = chess.Board(fen)
-    # 64 squares, 6 types of piece, 2 players, 2 types of castling (x2)
-    arr_size = (64 * 6 * 2) + 4
-    arr = np.zeros(arr_size, dtype='int')
-    # So we know whose turn it is, we put the next player's pieces first
-    order = [chess.WHITE, chess.BLACK] if board.turn == chess.WHITE else [chess.BLACK, chess.WHITE]
-    if reverse_order:
-        order = [not c for c in order]
-    for i, colour in enumerate(order):
-
-        for j, piece in enumerate(BITBOARD_PIECE_ORDER):
-            for k in list(board.pieces(piece, colour)):
-                idx = (i * arr_size // 2) + (j * 64) + k
-                arr[idx] = 1
-        castle_idx = arr_size - 4 + (2 * i)
-        arr[castle_idx] = board.has_kingside_castling_rights(colour)
-        arr[castle_idx + 1] = board.has_queenside_castling_rights(colour)
-    return arr
 
 
 def get_last_move_from_bitboard_uci(before, after):
@@ -115,28 +87,93 @@ def write_pickle():
             df = None
 
 
+def get_input_output_df(reverse=False):
+    s = Stockfish('stockfish')
+    from mini_project.train.output_features import end_positions, end_positions_to_array
+    from mini_project.train.train import get_policy_distribution
+    pickle_dir = '../../data/pickles'
+    new_pickles = '../../data/new_pickles'
+    it = os.listdir(pickle_dir)
+    for f in it if not reverse else np.flip(it):
+        print(f)
+        if os.path.exists(f'{new_pickles}/100_in_{f}'):
+            print('Already exists')
+            continue
+        df = pd.read_pickle(f'{pickle_dir}/{f}')
+        # Exclude mate in 1 because they have many solutions
+        # df = df.loc[~df['Themes'].str.contains('mateIn1')]
+        # TODO: Temporary, only get first 1000 so that we can get something finished at least
+        df = df.loc[~df['Themes'].str.contains('mateIn1')].iloc[:SUBSET]
+        arr = df[['PuzzleId', 'bitboard', 'FEN']].to_numpy()
+        output_arrays = np.array([end_positions_to_array(end_positions) for _ in range(len(arr))]).astype('object')
+        for i in range(len(arr)):
+            fen = arr[0:, 2][i]
+            board = chess.Board(fen)
+            res = stockfish_evaluate_all(board)
+            output_arrays[i] = get_policy_distribution(board, res, output_arrays[i])
+        pd.DataFrame(arr).to_pickle(f'{new_pickles}/{SUBSET}_in_{f}')
+        pd.DataFrame(output_arrays).to_pickle(f'{new_pickles}/{SUBSET}_out_{f}')
+
+
+def bugfix_input_output_df(reverse=False):
+    pickle_dir = '../../data/new_pickles'
+    concat_in = pd.DataFrame()
+    concat_out = pd.Series()
+    it = os.listdir(pickle_dir)
+    for f in it if not reverse else np.flip(it):
+        if 'out' in f:
+            continue
+        print(f)
+        f_in = f'{pickle_dir}/{f}'
+        df_in = pd.read_pickle(f_in)
+        df_out = pd.read_pickle(f_in.replace('in', 'out')).to_numpy()
+        new_arr_out = []
+        indexes = []
+        for i in range(len(df_out)):
+            try:
+                _ = np.where(df_out[i] > 0)
+                new_arr_out.append(df_out[i].astype('float32'))
+                indexes.append(i)
+            except ValueError:
+                print(f'Fixing {i}')
+                board = chess.Board(df_in.iloc[i][2])
+                res = stockfish_evaluate_all(board)
+                output_array = df_out[i]
+                output_array = get_policy_distribution(board, res, output_array)
+                new_arr_out.append(output_array.astype('float32'))
+        concat_in = pd.concat([concat_in, df_in[df_in.index.isin(indexes)]])
+        concat_out = pd.concat([concat_out, pd.Series(new_arr_out)])
+    concat_in.to_pickle(f'df_in.pickle{".reverse" if reverse else ""}')
+    concat_out.to_pickle(f'df_out.pickle{".reverse" if reverse else ""}')
+
+
+
 if __name__ == '__main__':
+    bugfix_input_output_df()
+    get_input_output_df()
+
+
     # path = '../../data/lichess_db_puzzle.csv'
     # to_bitboard()
     # preprocess_csv(path)
 
-    path = '../../data/lichess_db_puzzle.csv.processed'
-    i = 0
-    full_pickle = '../../data/lichess_db_puzzle_correct_move.pickle'
-    if not os.path.exists('../../data/lichess_db_puzzle_correct_move.pickle'):
-        write_pickle()
-        df = pd.concat([pd.read_pickle(f'../../data/pickles/{f}') for f in os.listdir('../../data/pickles')])
-        df.to_pickle(full_pickle)
-    # df = df.apply(get_puzzle, axis=1)
-    # df.to_pickle('../../data/lichess_db_puzzle_correct_move.pickle')
-
-    df = pd.read_pickle(full_pickle)
-    subset = df.head(100)
-
-    subset = subset.apply(get_puzzle, axis=1)
-    subset.to_pickle('../../data/lichess_db_puzzle_head.pickle')
-    # subset.to_csv('../../data/lichess_db_puzzle_head.csv')
-    subset = pd.read_pickle('../../data/lichess_db_puzzle_head.pickle')
-    bitboard = subset.iloc[0]['bitboard'][0]
-    output = subset.iloc[0]['output'][0]
-    print(subset)
+    # path = '../../data/lichess_db_puzzle.csv.processed'
+    # i = 0
+    # full_pickle = '../../data/lichess_db_puzzle_correct_move.pickle'
+    # if not os.path.exists('../../data/lichess_db_puzzle_correct_move.pickle'):
+    #     write_pickle()
+    #     df = pd.concat([pd.read_pickle(f'../../data/pickles/{f}') for f in os.listdir('../../data/pickles')])
+    #     df.to_pickle(full_pickle)
+    # # df = df.apply(get_puzzle, axis=1)
+    # # df.to_pickle('../../data/lichess_db_puzzle_correct_move.pickle')
+    #
+    # df = pd.read_pickle(full_pickle)
+    # subset = df.head(100)
+    #
+    # subset = subset.apply(get_puzzle, axis=1)
+    # subset.to_pickle('../../data/lichess_db_puzzle_head.pickle')
+    # # subset.to_csv('../../data/lichess_db_puzzle_head.csv')
+    # subset = pd.read_pickle('../../data/lichess_db_puzzle_head.pickle')
+    # bitboard = subset.iloc[0]['bitboard'][0]
+    # output = subset.iloc[0]['output'][0]
+    # print(subset)
