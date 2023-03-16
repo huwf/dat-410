@@ -5,7 +5,11 @@ import chess
 import numpy as np
 import pandas as pd
 from stockfish import Stockfish
-
+import tensorflow as tf
+from tensorflow.keras.layers import Dense, Flatten
+from tensorflow.keras.layers import Conv2D, MaxPooling2D
+from tensorflow.keras.models import Sequential
+from keras.optimizers import Adam
 from mini_project.evaluate import stockfish, stockfish_evaluate_all
 from mini_project.train.output_features import end_positions, square_index, end_positions_to_array
 
@@ -60,7 +64,7 @@ def get_policy_distribution(board, res, output_array):
 # from tensorflow.keras import applications
 # from tensorflow.keras.preprocessing.image import load_img, img_to_array
 # from tensorflow.keras.applications.vgg16 import decode_predictions, preprocess_input
-#%%
+
 
 import tensorflow as tf
 print(tf.keras)
@@ -81,67 +85,88 @@ def outputs(df):
     # ret = tf.convert_to_tensor([list(a) for a in ret])
     # return ret
 
-BATCH_SIZE = 80
 def make_convnet(X_train, y_train, X_test, y_test, flatten_first=False):
     model = Sequential()
-    # if flatten_first:
-    #     f1 = Flatten()(train_generator.layers[-1].output)
-
-    model.add(Conv2D(256, kernel_size=(3, 3), strides=(1, 1),
-                     activation='relu',
-                     input_shape=(13, 8, 8)))
-    model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
-    model.add(Conv2D(256, (3, 3), activation='relu'))
+    model.add(Conv2D(10, 3, input_shape=(13, 8, 8), activation='relu'))
+    model.add(MaxPooling2D(pool_size=(2, 2), strides=None))
     model.add(Flatten())
     model.add(Dense(128, activation='relu'))
-    model.add(Dense(2, activation='softmax'))
+    model.add(Dense(2928, activation='sigmoid'))
 
-    model.compile(loss='sparse_categorical_crossentropy',
-                  optimizer='adam',
-                  metrics=['accuracy'])
 
-    model.fit(X_train, y_train,
-              batch_size=BATCH_SIZE,
-              epochs=8,
-              verbose=1,
-              validation_data=(X_test, y_test))
+    model.compile(loss='binary_crossentropy', metrics=['accuracy'], optimizer=Adam(
+                learning_rate=0.0001)
+            )
+
+    model.fit(X_train, y_train, epochs=30, validation_data=(X_test, y_test), batch_size=100)
     return model
+
+def fen_to_bitboard(fen, reverse_order=False):
+    """Takes a FEN position, and returns an array representing the board
+    :param fen: A string in FEN format indicating the current state of play
+    See https://en.wikipedia.org/wiki/Forsyth-Edwards_Notation
+    :return: array of length 772 in the following format:
+    For each piece, blocks of 64 for an 8 x 8 chess board where 1 indicates
+    the presence of the piece, and 0 indicates the absence.
+    The first 6 * 64 in the array is the pieces for the player to move, the
+    second 6 * 64 is the opponent, the final four squares indicate whether
+    castling is allowed (current player first) for king's side and queen's side
+    Piece order: PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING
+    """
+    board = chess.Board(fen)
+    # 64 squares, 6 types of piece, 2 players, 2 types of castling (x2)
+    arr_size = (64 * 6 * 2) + 4
+    arr = np.zeros(arr_size, dtype='int')
+    # So we know whose turn it is, we put the next player's pieces first
+    order = [chess.WHITE, chess.BLACK] if board.turn == chess.WHITE else [chess.BLACK, chess.WHITE]
+    if reverse_order:
+        order = [not c for c in order]
+    for i, colour in enumerate(order):
+
+        for j, piece in enumerate(BITBOARD_PIECE_ORDER):
+            for k in list(board.pieces(piece, colour)):
+                idx = (i * arr_size // 2) + (j * 64) + k
+                arr[idx] = 1
+        castle_idx = arr_size - 4 + (2 * i)
+        arr[castle_idx] = board.has_kingside_castling_rights(colour)
+        arr[castle_idx + 1] = board.has_queenside_castling_rights(colour)
+    return arr
 
 
 
 if __name__ == '__main__':
     from utils import *
-    bugfix_input_output_df(reverse=True)
-    get_input_output_df(reverse=True)
+    #bugfix_input_output_df(reverse=True)
+    #get_input_output_df(reverse=True)
 
-    # import os
-    # print(os.getcwd())
-    # ins = inputs(
-    #     pd.read_pickle('train/df_in.pickle')
-    # )
-    # outs = outputs(
-    #     pd.read_pickle('train/df_out.pickle')
-    # )
-    #
-    # X_train = ins[:80]
-    # X_test = ins[80:100]
-    # y_train = outs[:80]
-    # y_test = outs[80:100]
-    # print(X_train[0].shape)
-    # net = make_convnet(X_train, y_train, X_test, y_test)
-    # print(net)
+    import os
+    print(os.getcwd())
+    ins = inputs(
+        pd.read_pickle('train/df_in.pickle')
+    )
+    outs = outputs(
+        pd.read_pickle('train/df_out.pickle')
+    )
+    
+    X_train = ins[:8000]
+    X_test = ins[800:10000]
+    y_train = outs[:8000]
+    y_test = outs[8000:10000]
+    print(X_train[0].shape)
+    net = make_convnet(X_train, y_train, X_test, y_test)
+    print(net)
 
 
 
-    # puzzle = df.iloc[32]
-    # board = chess.Board(puzzle['FEN'])
-    # print('White' if board.turn else 'Black')
-    # print(puzzle['bitboard'])
-    # s = Stockfish('stockfish')
-    # for move in board.legal_moves:
-    #     new_board = copy.deepcopy(board)
-    #     new_board.push(move)
-    #     res = stockfish(new_board, board.turn, s)
-    # res = stockfish_evaluate_all(board, board.turn, s)
-    # output_array = end_positions_to_array(end_positions)
-    # get_policy_distribution(board, res, output_array)
+    puzzle = df.iloc[32]
+    board = chess.Board(puzzle['FEN'])
+    print('White' if board.turn else 'Black')
+    print(puzzle['bitboard'])
+    s = Stockfish('stockfish')
+    for move in board.legal_moves:
+        new_board = copy.deepcopy(board)
+        new_board.push(move)
+        res = stockfish(new_board, board.turn, s)
+    res = stockfish_evaluate_all(board, board.turn, s)
+    output_array = end_positions_to_array(end_positions)
+    get_policy_distribution(board, res, output_array)
