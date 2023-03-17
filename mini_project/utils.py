@@ -1,8 +1,10 @@
+import math
+
 import chess
 import numpy as np
 
 BITBOARD_PIECE_ORDER = [chess.PAWN, chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN, chess.KING]
-
+K = 32
 
 def fen_to_bitboard(fen, reverse_order=False):
     """Takes a FEN position, and returns an array representing the board
@@ -22,8 +24,8 @@ def fen_to_bitboard(fen, reverse_order=False):
     arr = np.zeros(arr_size, dtype='int')
     # So we know whose turn it is, we put the next player's pieces first
     order = [chess.WHITE, chess.BLACK] if board.turn == chess.WHITE else [chess.BLACK, chess.WHITE]
-    if reverse_order:
-        order = [not c for c in order]
+    # if reverse_order:
+    #     order = [not c for c in order]
     for i, colour in enumerate(order):
 
         for j, piece in enumerate(BITBOARD_PIECE_ORDER):
@@ -37,5 +39,16 @@ def fen_to_bitboard(fen, reverse_order=False):
 
 
 
-
-
+def elo(r_a, results):
+    q_a = math.pow(10, r_a/400)
+    score = 0
+    expected_score = 0
+    for r_b, result in results:
+        result = result == "True"
+        q_b = math.pow(10, r_b/400)
+        e_a = q_a / (q_a + q_b)
+        score += result
+        expected_score += e_a * result
+    ret = r_a + (K * (score - expected_score))
+    print(ret)
+    return ret

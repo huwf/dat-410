@@ -21,9 +21,6 @@ class Player:
     def __init__(self, colour=chess.WHITE, name=None):  # , stockfish=None):
         self.colour = colour
         self.name = name or ('White' if colour else 'Black')
-        # self.stockfish = stockfish
-
-
 
     def __repr__(self):
         return f"<{self.__class__.__name__} {self.name}>"
